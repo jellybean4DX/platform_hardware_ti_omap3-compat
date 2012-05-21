@@ -475,10 +475,10 @@ static void set_ext_matrix(omap3_hwc_ext_t *ext, struct hwc_rect region)
 static void
 omap3_hwc_create_ext_matrix(omap3_hwc_ext_t *ext)
 {
-    /* use VGA external resolution as default */
+    /* use 848x480 resolution as default */
     if (!ext->xres ||
         !ext->yres) {
-        ext->xres = 640;
+        ext->xres = 848;
         ext->yres = 480;
     }
 
