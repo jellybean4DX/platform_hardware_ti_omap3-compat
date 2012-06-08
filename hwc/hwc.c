@@ -1199,7 +1199,11 @@ static int omap3_hwc_prepare(struct hwc_composer_device *dev, hwc_layer_list_t* 
 
     dsscomp->mode = DSSCOMP_SETUP_DISPLAY;
     dsscomp->mgrs[0].ix = 0;
-    dsscomp->mgrs[0].alpha_blending = 1;
+    dsscomp->mgrs[0].alpha_blending = 0;
+    /*
+     Enable transparency key to make graphics and video layers visible together
+     */
+    dsscomp->mgrs[0].trans_enabled = 1;
     dsscomp->mgrs[0].swap_rb = hwc_dev->swap_rb;
     dsscomp->num_mgrs = 1;
 
@@ -1328,7 +1332,9 @@ static int omap3_hwc_set(struct hwc_composer_device *dev, hwc_display_t dpy,
             }
         }
 
-        dump_dsscomp(dsscomp);
+        if (debug)
+               dump_dsscomp(dsscomp);
+        
 
         // signal the event thread that a post has happened
         write(hwc_dev->pipe_fds[1], "s", 1);
