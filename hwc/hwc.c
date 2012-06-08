@@ -979,8 +979,7 @@ static int omap3_hwc_prepare(struct hwc_composer_device *dev, hwc_layer_list_t* 
 
     if (num.NV12 && num_fb <=1)
     {
-          hwc_dev->force_sgx = 0;
-          hwc_dev->force_sgx = 1; // work around to fix black screen display when switched to video Recording 
+          hwc_dev->force_sgx = 0; 
     }
 
     /* phase 3 logic */
