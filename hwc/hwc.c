@@ -147,6 +147,7 @@ struct omap3_hwc_device {
 typedef struct omap3_hwc_device omap3_hwc_device_t;
 
 static int debug = 0;
+static int hdmi_enabled = 0;
 
 static void dump_layer(hwc_layer_t const* l)
 {
@@ -362,6 +363,15 @@ omap3_hwc_setup_layer(omap3_hwc_device_t *hwc_dev, struct dss2_ovl_info *ovl,
     oc->win.w = WIDTH(layer->displayFrame);
     oc->win.h = HEIGHT(layer->displayFrame);
 
+    if (hdmi_enabled && (width == 1280) && (height == 720)) {
+        oc->win.w = width;
+        oc->win.h = height;
+    } else {
+		oc->win.x = 0;
+		oc->win.y = 0;
+	}
+
+
     /* crop */
     oc->crop.x = layer->sourceCrop.left;
     oc->crop.y = layer->sourceCrop.top;
@@ -475,10 +485,10 @@ static void set_ext_matrix(omap3_hwc_ext_t *ext, struct hwc_rect region)
 static void
 omap3_hwc_create_ext_matrix(omap3_hwc_ext_t *ext)
 {
-    /* use 848x480 resolution as default */
+    /* use VGA external resolution as default */
     if (!ext->xres ||
         !ext->yres) {
-        ext->xres = 848;
+        ext->xres = 640;
         ext->yres = 480;
     }
 
@@ -928,6 +938,7 @@ static int omap3_hwc_prepare(struct hwc_composer_device *dev, hwc_layer_list_t* 
     struct dsscomp_setup_dispc_data *dsscomp = &hwc_dev->dsscomp_data;
     struct counts num = { .composited_layers = list ? list->numHwLayers : 0 };
     unsigned int i, ix;
+    int num_fb = 0;
 
     pthread_mutex_lock(&hwc_dev->lock);
     memset(dsscomp, 0x0, sizeof(*dsscomp));
@@ -967,11 +978,14 @@ static int omap3_hwc_prepare(struct hwc_composer_device *dev, hwc_layer_list_t* 
                 hwc_dev->force_sgx = 0;
         }
     }
-
+    /* hack for OMAP3: OMAP3 doesn't support z-order hence whenever
+     * more than one FB and overlay comes then this has to go from SGX
+     */
+    num_fb = num.BGR + num.RGB;
     /* hack for omap3, overlay can be active only for YUV format */
     /* For other formats everything has to go through frame buffer */ 
 
-    if (num.NV12)
+    if (num.NV12 && num_fb <= 1)
     {
           hwc_dev->force_sgx = 0;
     }
@@ -1029,13 +1043,15 @@ static int omap3_hwc_prepare(struct hwc_composer_device *dev, hwc_layer_list_t* 
             layer->compositionType = HWC_OVERLAY;
 
             /* clear FB above all opaque layers if rendering via SGX */
-            if (hwc_dev->use_sgx && !is_BLENDED(layer))
+	    /* for OMAP3: if FB layer data comes on top of overlay area then that area
+	     * need to clear after every transaction.
+	     */
+            if (hwc_dev->use_sgx)
                 layer->hints |= HWC_HINT_CLEAR_FB;
             /* see if any of the (non-backmost) overlays are doing blending */
             else if (is_BLENDED(layer) && i > 0)
                 hwc_dev->ovls_blending = 1;
 
-            LOGD("In fordsscomp->num_ovls = %d handle = %x *handle = %x\n", dsscomp->num_ovls, handle, *handle);
             hwc_dev->buffers[dsscomp->num_ovls] = handle;
 
             omap3_hwc_setup_layer(hwc_dev,
@@ -1081,7 +1097,6 @@ static int omap3_hwc_prepare(struct hwc_composer_device *dev, hwc_layer_list_t* 
         }
     }
 
-   LOGD("DSSCOMP->num_ovls = %d\n", dsscomp->num_ovls);
     /* if scaling GFX (e.g. only 1 scaled surface) use a VID pipe */
     if (scaled_gfx)
         dsscomp->ovls[0].cfg.ix = dsscomp->num_ovls;
@@ -1198,7 +1213,11 @@ static int omap3_hwc_prepare(struct hwc_composer_device *dev, hwc_layer_list_t* 
 
     dsscomp->mode = DSSCOMP_SETUP_DISPLAY;
     dsscomp->mgrs[0].ix = 0;
-    dsscomp->mgrs[0].alpha_blending = 1;
+    dsscomp->mgrs[0].alpha_blending = 0;
+    /*
+     Enable transperency key to make graphics & video layers visible together
+    */
+    dsscomp->mgrs[0].trans_enabled = 1;
     dsscomp->mgrs[0].swap_rb = hwc_dev->swap_rb;
     dsscomp->num_mgrs = 1;
 
@@ -1327,7 +1346,8 @@ static int omap3_hwc_set(struct hwc_composer_device *dev, hwc_display_t dpy,
             }
         }
 
-        dump_dsscomp(dsscomp);
+        if (debug)
+		dump_dsscomp(dsscomp);
 
         // signal the event thread that a post has happened
         write(hwc_dev->pipe_fds[1], "s", 1);
@@ -1459,7 +1479,19 @@ static void handle_hotplug(omap3_hwc_device_t *hwc_dev, int state)
     pthread_mutex_lock(&hwc_dev->lock);
     ext->dock.enabled = ext->mirror.enabled = 0;
     if (state) {
+	hdmi_enabled = 1;
+
+	system("echo 0 >" "/sys/devices/platform/dsscomp/isprsz/enable");
+	system("echo 0 >" "/sys/devices/platform/omapdss/display1/enabled");
+	system("echo 0 >" "/sys/devices/platform/omapdss/overlay0/enabled");
+	system("echo 0 >" "/sys/devices/platform/omapdss/display0/enabled");
+	system("echo hdmi >" "/sys/devices/platform/omapdss/manager0/display");
+	system("echo 1 >" "/sys/devices/platform/omapdss/display1/enabled");
+	system("echo 1 >" "/sys/devices/platform/omapdss/overlay0/enabled");
+
+
         /* check whether we can clone and/or dock */
+#if 0 // its OMAP4 specific code not required for OMAP3.
         char value[PROPERTY_VALUE_MAX];
         property_get("persist.hwc.docking.enabled", value, "1");
         ext->dock.enabled = atoi(value) > 0;
@@ -1492,8 +1524,22 @@ static void handle_hotplug(omap3_hwc_device_t *hwc_dev, int state)
             } else
                 ext->mirror.enabled = 0;
         }
+#endif
     } else {
+        hdmi_enabled = 0;
         ext->last_mode = 0;
+
+		system("echo 1 >" "/sys/devices/platform/dsscomp/isprsz/enable");
+        system("echo 0 >" "/sys/devices/platform/omapdss/display1/enabled");
+        system("echo 0 >" "/sys/devices/platform/omapdss/overlay0/enabled");
+		system("echo 0 >" "/sys/devices/platform/omapdss/overlay1/enabled");
+		system("echo 800,450 >" "/sys/devices/platform/omapdss/overlay1/output_size");
+        system("echo lcd >" "/sys/devices/platform/omapdss/manager0/display");
+        system("echo 1 >" "/sys/devices/platform/omapdss/display0/enabled");
+		system("echo 1 >" "/sys/devices/platform/omapdss/overlay1/enabled");
+        system("echo 1 >" "/sys/devices/platform/omapdss/overlay0/enabled");
+
+
     }
     omap3_hwc_create_ext_matrix(ext);
     LOGI("external display changed (state=%d, mirror={%s tform=%ddeg%s}, dock={%s tform=%ddeg%s}, tv=%d", state,
@@ -1513,7 +1559,7 @@ static void handle_hotplug(omap3_hwc_device_t *hwc_dev, int state)
 
 static void handle_uevents(omap3_hwc_device_t *hwc_dev, const char *s)
 {
-    if (strcmp(s, "change@/devices/virtual/switch/hdmi"))
+    if (strcmp(s, "change@/devices/virtual/switch/display_hdmi"))
         return;
 
     s += strlen(s) + 1;
@@ -1719,7 +1765,7 @@ static int omap3_hwc_device_open(const hw_module_t* module, const char* name,
          hwc_dev->ext.mirror_region.right, hwc_dev->ext.mirror_region.bottom);
 
     /* read switch state */
-    int sw_fd = open("/sys/class/switch/hdmi/state", O_RDONLY);
+    int sw_fd = open("/sys/class/switch/display_hdmi/state", O_RDONLY);
     int hpd = 0;
     if (sw_fd >= 0) {
         char value;
