@@ -1,4 +1,4 @@
-# only include if running on an omap3 platform
+# only include if running on an omap4 platform
 ifeq ($(TARGET_BOARD_PLATFORM),omap3)
 
 LOCAL_PATH:= $(call my-dir)
