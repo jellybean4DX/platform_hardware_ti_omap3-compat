@@ -1,22 +1,22 @@
 /*
- * dspbridge/mpu_api/inc/cmm.h
- *
- * DSP-BIOS Bridge driver support functions for TI OMAP processors.
- *
- * Copyright (C) 2007 Texas Instruments, Inc.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU Lesser General Public License as published 
- * by the Free Software Foundation version 2.1 of the License.
- *
- * This program is distributed .as is. WITHOUT ANY WARRANTY of any kind,
- * whether express or implied; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ *  Copyright 2001-2008 Texas Instruments - http://www.ti.com/
+ * 
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 
 /*
  *  ======== cmm.h ========
+ *  DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *  Purpose:
  *      The Communication Memory Management(CMM) module provides shared memory
  *      management services for DSP/BIOS Bridge data streaming and messaging.
@@ -112,9 +112,9 @@ extern "C" {
  *      hDevObject: Handle to a device object.
  *      pMgrAttrs:  Comm mem manager attributes.
  *  Returns:
- *      0:          Success;
- *      -ENOMEM:    Insufficient memory for requested resources.
- *      -EPERM:     Failed to initialize critical sect sync object.
+ *      DSP_SOK:        Success;
+ *      DSP_EMEMORY:    Insufficient memory for requested resources.
+ *      DSP_EFAIL:      Failed to initialize critical sect sync object.
  *
  *  Requires:
  *      CMM_Init() called.
@@ -123,7 +123,7 @@ extern "C" {
  *  Ensures:
  *
  */
-	extern int CMM_Create(OUT struct CMM_OBJECT** phCmmMgr,
+	extern DSP_STATUS CMM_Create(OUT struct CMM_OBJECT** phCmmMgr,
 				     struct DEV_OBJECT* hDevObject,
 				     IN CONST struct CMM_MGRATTRS *pMgrAttrs);
 
@@ -134,19 +134,19 @@ extern "C" {
  *  Parameters:
  *      hCmmMgr:    Cmm Mgr handle.
  *      bForce:     Force deallocation of all cmm memory immediately if set TRUE.
- *                  If FALSE, and outstanding allocations will return -EPERM
+ *                  If FALSE, and outstanding allocations will return DSP_EFAIL
  *                  status.
  *  Returns:
- *      0:          CMM object & resources deleted.
- *      -EPERM:     Unable to free CMM object due to outstanding allocation.
- *      -EFAULT:    Unable to free CMM due to bad handle.
+ *      DSP_SOK:        CMM object & resources deleted.
+ *      DSP_EFAIL:      Unable to free CMM object due to outstanding allocation.
+ *      DSP_EHANDLE:    Unable to free CMM due to bad handle.
  *  Requires:
  *      CMM is initialized.
  *      hCmmMgr != NULL.
  *  Ensures:
  *      Memory resources used by Cmm Mgr are freed.
  */
-	extern int CMM_Destroy(struct CMM_OBJECT* hCmmMgr, bool bForce);
+	extern DSP_STATUS CMM_Destroy(struct CMM_OBJECT* hCmmMgr, bool bForce);
 
 /*
  *  ======== CMM_Exit ========
@@ -172,15 +172,15 @@ extern "C" {
  *      ulSegId:    SM segment Id used in CMM_Calloc() attrs.
  *                  Set to 0 to use default segment.
  *  Returns:
- *      0
- *      -EPERM
+ *      DSP_SOK
+ *      DSP_EFAIL
  *  Requires:
  *      CMM initialized.
  *      pBufPA != NULL
  *  Ensures:
  *
  */
-	extern int CMM_FreeBuf(struct CMM_OBJECT* hCmmMgr,
+	extern DSP_STATUS CMM_FreeBuf(struct CMM_OBJECT* hCmmMgr,
 				      PVOID pBufPA, ULONG ulSegId);
 
 /*
@@ -192,14 +192,14 @@ extern "C" {
  *      phCmmMgr:     Location to store the shared memory mgr handle on output.
  *
  *  Returns:
- *      0:            Cmm Mgr opaque handle returned.
- *      -EFAULT:      Invalid handle.
+ *      DSP_SOK:        Cmm Mgr opaque handle returned.
+ *      DSP_EHANDLE:    Invalid handle.
  *  Requires:
  *      phCmmMgr != NULL
  *      hDevObject != NULL
  *  Ensures:
  */
-	extern int CMM_GetHandle(DSP_HPROCESSOR hProcessor,
+	extern DSP_STATUS CMM_GetHandle(DSP_HPROCESSOR hProcessor,
 					OUT struct CMM_OBJECT** phCmmMgr);
 
 /*
@@ -211,14 +211,14 @@ extern "C" {
  *      pCmmInfo:    Location to store the Cmm information on output.
  *
  *  Returns:
- *      0:           Success.
- *      -EFAULT:     Invalid handle.
- *      -EINVAL Invalid input argument.
+ *      DSP_SOK:        Success.
+ *      DSP_EHANDLE:    Invalid handle.
+ *      DSP_EINVALIDARG Invalid input argument.
  *  Requires:
  *  Ensures:
  *
  */
-	extern int CMM_GetInfo(struct CMM_OBJECT* hCmmMgr,
+	extern DSP_STATUS CMM_GetInfo(struct CMM_OBJECT* hCmmMgr,
 				      					OUT struct CMM_INFO * pCmmInfo);
 
 /*
@@ -271,10 +271,10 @@ extern "C" {
  *      pulSegId:        Address to store segment Id.
  *
  *  Returns:
- *      0:               Success.
- *      -EFAULT:         Invalid hCmmMgr handle.
- *      -EINVAL:         Invalid input argument.
- *      -EPERM:          Unable to register.
+ *      DSP_SOK:         Success.
+ *      DSP_EHANDLE:     Invalid hCmmMgr handle.
+ *      DSP_EINVALIDARG: Invalid input argument.
+ *      DSP_EFAIL:       Unable to register.
  *      - On success *pulSegId is a valid SM segment ID.
  *  Requires:
  *      ulSize > 0
@@ -284,7 +284,7 @@ extern "C" {
  *  Ensures:
  *
  */
-	extern int CMM_RegisterGPPSMSeg(struct CMM_OBJECT* hCmmMgr,
+	extern DSP_STATUS CMM_RegisterGPPSMSeg(struct CMM_OBJECT* hCmmMgr,
 					       DWORD dwGPPBasePA,
 					       ULONG ulSize,
 					       DWORD dwDSPAddrOffset,
@@ -303,15 +303,15 @@ extern "C" {
  *      hCmmMgr:    Handle to a Cmm Mgr.
  *      ulSegId     Segment identifier returned by CMM_RegisterGPPSMSeg.
  *  Returns:
- *       0:         Success.
- *       -EFAULT:   Invalid handle.
- *       -EINVAL:   Invalid ulSegId.
- *       -EPERM:    Unable to unregister for unknown reason.
+ *       DSP_SOK:         Success.
+ *       DSP_EHANDLE:     Invalid handle.
+ *       DSP_EINVALIDARG: Invalid ulSegId.
+ *       DSP_EFAIL:       Unable to unregister for unknown reason.
  *  Requires:
  *  Ensures:
  *
  */
-	extern int CMM_UnRegisterGPPSMSeg(struct CMM_OBJECT* hCmmMgr,
+	extern DSP_STATUS CMM_UnRegisterGPPSMSeg(struct CMM_OBJECT* hCmmMgr,
 						 ULONG ulSegId);
 
 /*
@@ -345,9 +345,9 @@ extern "C" {
  *      hCmmMgr:        Handle to Cmm Mgr associated with this translator.
  *      pXlatorAttrs:   Translator attributes used for the client NODE or STREAM.
  *  Returns:
- *      0:              Success.
- *      -EINVAL:        Bad input Attrs.
- *      -ENOMEM:        Insufficient memory(local) for requested resources.
+ *      DSP_SOK:            Success.
+ *      DSP_EINVALIDARG:    Bad input Attrs.
+ *      DSP_EMEMORY:   Insufficient memory(local) for requested resources.
  *  Requires:
  *      phXlator != NULL
  *      hCmmMgr != NULL
@@ -355,7 +355,7 @@ extern "C" {
  *  Ensures:
  *
  */
-	extern int CMM_XlatorCreate(OUT struct CMM_XLATOROBJECT** phXlator,
+	extern DSP_STATUS CMM_XlatorCreate(OUT struct CMM_XLATOROBJECT** phXlator,
 					   struct CMM_OBJECT* hCmmMgr,
 					   struct CMM_XLATORATTRS *pXlatorAttrs);
 
@@ -367,15 +367,15 @@ extern "C" {
  *      hXlator:    handle to translator.
  *      bForce:     bForce = TRUE will free XLators SM buffers/dscriptrs.
  *  Returns:
- *      0:          Success.
- *      -EFAULT:    Bad translator handle.
- *      -EPERM:     Unable to free translator resources.
+ *      DSP_SOK:        Success.
+ *      DSP_EHANDLE:    Bad translator handle.
+ *      DSP_EFAIL:      Unable to free translator resources.
  *  Requires:
  *      cRefs > 0
  *  Ensures:
  *
  */
-	extern int CMM_XlatorDelete(struct CMM_XLATOROBJECT* hXlator,
+	extern DSP_STATUS CMM_XlatorDelete(struct CMM_XLATOROBJECT* hXlator,
 																bool bForce);
 
 /*
@@ -387,13 +387,13 @@ extern "C" {
  *      hXlator:    handle to translator.
  *      pBufVa      Virtual address of PA to free.
  *  Returns:
- *      0:          Success.
- *      -EFAULT:    Bad translator handle.
+ *      DSP_SOK:        Success.
+ *      DSP_EHANDLE:    Bad translator handle.
  *  Requires:
  *  Ensures:
  *
  */
-	extern int CMM_XlatorFreeBuf(struct CMM_XLATOROBJECT* hXlator,
+	extern DSP_STATUS CMM_XlatorFreeBuf(struct CMM_XLATOROBJECT* hXlator,
 																PVOID pBufVa);
 
 /*
@@ -409,8 +409,8 @@ extern "C" {
  *     uSegId:      Segment identifier of SM segment(s)
  *     bSetInfo     Set xlator fields if TRUE, else return base addr
  *  Returns:
- *      0:          Success.
- *      -EFAULT:    Bad translator handle.
+ *      DSP_SOK:        Success.
+ *      DSP_EHANDLE:    Bad translator handle.
  *  Requires:
  *      (cRefs > 0)
  *      (pAddr != NULL)
@@ -418,7 +418,7 @@ extern "C" {
  *  Ensures:
  *
  */
-	extern int CMM_XlatorInfo(struct CMM_XLATOROBJECT* hXlator,
+	extern DSP_STATUS CMM_XlatorInfo(struct CMM_XLATOROBJECT* hXlator,
 					 IN OUT BYTE ** pAddr,
 					 ULONG ulSize, UINT uSegId,
 					 bool bSetInfo);

@@ -76,7 +76,7 @@
 
 /*  ----------------------------------- DSP/BIOS Bridge */
 #include <dbdefs.h>
-#include <errno.h>
+#include <errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
 #include <dbg.h>
@@ -87,6 +87,7 @@
 
 /*  ----------------------------------- Others */
 #include <dsptrap.h>
+
 /*  ----------------------------------- This */
 #include "_dbdebug.h"
 #include "_dbpriv.h"
@@ -97,27 +98,11 @@
 #include <perfutils.h>
 #endif
 
-static struct mmap_element *mmaplist;
-static sem_t sem_mmap;
 /*  ----------------------------------- Globals */
 extern int hMediaFile;		/* class driver handle */
 
-static void start(void) __attribute__((constructor));
-int insert_mmapelement(struct mmap_element *elem,
-			struct mmap_element **mmaplist);
-int delete_mmapelement(BYTE *vb, struct mmap_element **mmaplist);
-
-
-void start(void)
-{
-	if (sem_init(&sem_mmap, 0, 1) == -1)
-		DEBUGMSG(DSPAPI_ZONE_ERROR,
-			(TEXT("NODE: Failed to Initialize"
-				"the MMAP semaphore\n")));
-}
-
 /* Declared here, not to users */
-int GetNodeType(DSP_HNODE hNode, DSP_NODETYPE *pNodeType);
+DSP_STATUS GetNodeType(DSP_HNODE hNode, DSP_NODETYPE *pNodeType);
 
 /*
  *  ======== DSPNode_Allocate ========
@@ -131,13 +116,12 @@ DBAPI DSPNode_Allocate(DSP_HPROCESSOR hProcessor,
 		 IN OPTIONAL struct DSP_NODEATTRIN *pAttrIn,
 		 OUT DSP_HNODE *phNode)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 	struct CMM_OBJECT *hCmm;		/* shared memory mngr handle */
 	struct CMM_INFO pInfo;		/* Used for virtual space allocation */
 	PVOID pVirtBase;
 	struct DSP_BUFFERATTR bufAttr;
-	struct mmap_element *pelement;
     DSP_NODETYPE nodeType;
     struct DSP_NDBPROPS    nodeProps;
     UINT            heapSize = 0;
@@ -145,17 +129,17 @@ DBAPI DSPNode_Allocate(DSP_HPROCESSOR hProcessor,
     UINT            uProfileID;
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPNode_Allocate:\r\n")));
 	if (!hProcessor) {
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPNode_Allocate: "
 				"hProcessor is Invalid \r\n")));
-		goto func_end;
+		goto func_cont;
 	}
 	if (!(pNodeID) || !(phNode)) {
-		status = -EFAULT;
+		status = DSP_EPOINTER;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPNode_Allocate: "
 			"Invalid pointer in the Input\r\n")));
-		goto func_end;
+		goto func_cont;
 	}
 	/* First get the NODE properties, allocate, reserve
 				memory for Node heap */
@@ -181,7 +165,7 @@ DBAPI DSPNode_Allocate(DSP_HPROCESSOR hProcessor,
 					("DSPNodeAllocate: Node heap memory"
 							  "addr, size \n"));
 				if ((pGPPVirtAddr == NULL))
-					status = -ENOMEM;
+					status = DSP_EMEMORY;
 				pAttrIn->uHeapSize = heapSize;
 				pAttrIn->pGPPVirtAddr = pGPPVirtAddr;
 			}
@@ -203,11 +187,14 @@ DBAPI DSPNode_Allocate(DSP_HPROCESSOR hProcessor,
 		tempStruct.ARGS_NODE_ALLOCATE.phNode = phNode;
 		status = DSPTRAP_Trap(&tempStruct, CMD_NODE_ALLOCATE_OFFSET);
 	}
+func_cont:
 	 /* If 1st SM segment is configured then allocate and map it to
 		this process.*/
-	if (DSP_FAILED(status))
-		goto func_end;
-
+	if (!DSP_SUCCEEDED(status)) {
+		if (pGPPVirtAddr)
+			free(pGPPVirtAddr);
+		return status;
+	}
 	tempStruct.ARGS_CMM_GETHANDLE.hProcessor = hProcessor;
 	tempStruct.ARGS_CMM_GETHANDLE.phCmmMgr = &hCmm;
 	status = DSPTRAP_Trap(&tempStruct, CMD_CMM_GETHANDLE_OFFSET);
@@ -217,20 +204,22 @@ DBAPI DSPNode_Allocate(DSP_HPROCESSOR hProcessor,
 		tempStruct.ARGS_CMM_GETINFO.pCmmInfo = &pInfo;
 		status = DSPTRAP_Trap(&tempStruct, CMD_CMM_GETINFO_OFFSET);
 		if (DSP_FAILED(status)) {
-			status = -EPERM;
+			status = DSP_EFAIL;
 			DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT(
 			"NODE: DSPNode_Allocate: "
 			"Failed to get SM segment\r\n")));
 		} else
-			status = 0;
+			status = DSP_SOK;
 
 	} else {
-		status = -EPERM;
+		status = DSP_EFAIL;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT(
 			"NODE: DSPNode_Allocate:Failed to CMM handle\r\n")));
 	}
-	if (DSP_FAILED(status))
-		goto func_end;
+	if (!DSP_SUCCEEDED(status)) {
+		free(pGPPVirtAddr);
+		return status;
+	}
 
 	GetNodeType(*phNode, &nodeType);
 	if ((nodeType != NODE_DEVICE) && (pInfo.ulNumGPPSMSegs > 0)) {
@@ -241,16 +230,15 @@ DBAPI DSPNode_Allocate(DSP_HPROCESSOR hProcessor,
 				 PROT_READ | PROT_WRITE, MAP_SHARED |
 				 MAP_LOCKED, hMediaFile,
 				 pInfo.segInfo[0].dwSegBasePa);
-
 			if (!pVirtBase) {
 				DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: "
 				"DSPNode_Allocate:Virt alloc failed\r\n")));
-				status = -ENOMEM;
+				status = DSP_EMEMORY;
 				/* Clean up */
 				tempStruct.ARGS_NODE_DELETE.hNode = *phNode;
 				DSPTRAP_Trap(&tempStruct,
 					CMD_NODE_DELETE_OFFSET);
-				goto func_end;
+				return status;
 			}
 			/* set node translator's virt addr range for seg */
 			bufAttr.uAlignment = 0;
@@ -267,90 +255,25 @@ DBAPI DSPNode_Allocate(DSP_HPROCESSOR hProcessor,
 				tempStruct.ARGS_NODE_DELETE.hNode = *phNode;
 				DSPTRAP_Trap(&tempStruct,
 					CMD_NODE_DELETE_OFFSET);
-				goto func_end;
-			}
-
-			pelement = malloc(sizeof(struct mmap_element));
-			if (!pelement) {
-				fprintf(stdout, "DSPNODE:Alloc for mmap element failed\n");
-			} else {
-				pelement->virt_base = (BYTE *)pVirtBase;
-				pelement->seg_size = pInfo.segInfo[0].ulTotalSegSize;
-				insert_mmapelement(pelement, &mmaplist);
 			}
 		}
 	}
-
-func_end:
-	if (DSP_FAILED(status) && pGPPVirtAddr)
-		free(pGPPVirtAddr);
-
     return status;
 }
 
-int insert_mmapelement(struct mmap_element *elem, struct mmap_element **mmaplist)
-{
-	sem_wait(&sem_mmap);
-	elem->next = *mmaplist;
-	*mmaplist = elem;
-	sem_post(&sem_mmap);
-
-	return 0;
-}
-
-int delete_mmapelement(BYTE *vb, struct mmap_element **mmaplist)
-{
-	int ret = 0;
-	struct mmap_element *tmp = NULL, *tmp2 = NULL;
-
-	sem_wait(&sem_mmap);
-	tmp = *mmaplist;
-	for (; tmp && tmp->virt_base != vb; tmp = tmp->next)
-		tmp2 = tmp;
-
-	if (!tmp) {
-		ret = -1;
-		goto func_end;
-	} else if (!tmp2)
-		*mmaplist = tmp->next;
-	else
-		tmp2->next = tmp->next;
-
-	free(tmp);
-
-func_end:
-	sem_post(&sem_mmap);
-
-	return ret;
-}
-
-void munmap_all(void)
-{
-	struct mmap_element *tmp;
-
-	sem_wait(&sem_mmap);
-
-	while (mmaplist) {
-		munmap(mmaplist->virt_base, mmaplist->seg_size);
-		tmp = mmaplist;
-		mmaplist = mmaplist->next;
-		free(tmp);
-	}
-	sem_post(&sem_mmap);
-}
 /*
  *  ======== DSPNode_AllocMsgBuf ========
  */
 DBAPI DSPNode_AllocMsgBuf(DSP_HNODE hNode, UINT uSize,
 		   IN OPTIONAL struct DSP_BUFFERATTR *pAttr, OUT BYTE **pBuffer)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION,
 		(TEXT("NODE: DSPNode_AllocMsgBuf:\r\n")));
 
 	if (uSize == 0) {
-		status = -EINVAL;
+		status = DSP_ESIZE;
 		if (pBuffer)
 			*pBuffer = NULL;
 
@@ -370,20 +293,20 @@ DBAPI DSPNode_AllocMsgBuf(DSP_HNODE hNode, UINT uSize,
 					DEBUGMSG(DSPAPI_ZONE_FUNCTION,
 					(TEXT("NODE: DSPNode_AllocMsgBuf: "
 					"No SM\r\n")));
-					status = -ENOMEM;	/* No SM */
+					status = DSP_EMEMORY;	/* No SM */
 				}
 			} else
 				*pBuffer = NULL;
 
 		} else {
 			/* Invalid pointer */
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 			DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: "
 			"DSPNode_AllocBuf: Invalid pointer in the Input\r\n")));
 		}
 	} else {
 		/* Invalid handle */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPNode_AllocMsgBuf: "
 						"hNode is Invalid \r\n")));
 		if (pBuffer)
@@ -401,7 +324,7 @@ DBAPI DSPNode_AllocMsgBuf(DSP_HNODE hNode, UINT uSize,
  */
 DBAPI DSPNode_ChangePriority(DSP_HNODE hNode, INT iPriority)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION,
@@ -418,11 +341,11 @@ DBAPI DSPNode_ChangePriority(DSP_HNODE hNode, INT iPriority)
 			status = DSPTRAP_Trap(&tempStruct,
 					CMD_NODE_CHANGEPRIORITY_OFFSET);
 		} else
-			status = -EDOM;
+			status = DSP_ERANGE;
 
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPNode_ChangePriority: "
 			"hNode is Invalid \r\n")));
@@ -454,7 +377,7 @@ DBAPI DSPNode_ConnectEx(DSP_HNODE hNode, UINT uStream, DSP_HNODE hOtherNode,
 		  UINT uOtherStream, IN OPTIONAL struct DSP_STRMATTR *pAttrs,
 		  IN OPTIONAL struct DSP_CBDATA *pConnParam)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPNode_ConnectEx:\r\n")));
@@ -471,7 +394,7 @@ DBAPI DSPNode_ConnectEx(DSP_HNODE hNode, UINT uStream, DSP_HNODE hOtherNode,
 		status = DSPTRAP_Trap(&tempStruct, CMD_NODE_CONNECT_OFFSET);
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPNode_Connect: "
 		"hNode or hOtherNode is Invalid Handle\r\n")));
 	}
@@ -487,7 +410,7 @@ DBAPI DSPNode_ConnectEx(DSP_HNODE hNode, UINT uStream, DSP_HNODE hOtherNode,
  */
 DBAPI DSPNode_Create(DSP_HNODE hNode)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 #ifdef DEBUG_BRIDGE_PERF
 	struct timeval tv_beg;
@@ -508,7 +431,7 @@ DBAPI DSPNode_Create(DSP_HNODE hNode)
 		status = DSPTRAP_Trap(&tempStruct, CMD_NODE_CREATE_OFFSET);
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 		(TEXT("NODE: DSPNode_Create: hNode is Invalid Handle\r\n")));
 	}
@@ -529,7 +452,7 @@ DBAPI DSPNode_Create(DSP_HNODE hNode)
  */
 DBAPI DSPNode_Delete(DSP_HNODE hNode)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 	BYTE *pVirtBase = NULL;
 	struct DSP_BUFFERATTR bufAttr;
@@ -549,7 +472,7 @@ DBAPI DSPNode_Delete(DSP_HNODE hNode)
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPNode_Delete:\r\n")));
 	if (!hNode) {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPNode_Delete: "
 					"hNode is Invalid Handle\r\n")));
 		return status;
@@ -565,20 +488,20 @@ DBAPI DSPNode_Delete(DSP_HNODE hNode)
 		tempStruct.ARGS_CMM_GETINFO.pCmmInfo = &pInfo;
 		status = DSPTRAP_Trap(&tempStruct, CMD_CMM_GETINFO_OFFSET);
 		if (DSP_FAILED(status)) {
-			status = -EPERM;
+			status = DSP_EFAIL;
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPNode_Delete:"
 					" Failed to get SM segment\r\n")));
 		} else
-			status = 0;
+			status = DSP_SOK;
 
 	} else {
-		status = -EPERM;
+		status = DSP_EFAIL;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPNode_Delete: "
 					"Failed to CMM handle\r\n")));
 	}
 	if (!DSP_SUCCEEDED(status)) {
-		status = -EBADR;	/* no SM segments*/
+		status = DSP_EBADSEGID;	/* no SM segments*/
 		return status;
 	}
     status = DSPNode_GetAttr(hNode, &nodeAttr, sizeof(nodeAttr));
@@ -598,10 +521,8 @@ DBAPI DSPNode_Delete(DSP_HNODE hNode)
 
 			if (munmap(pVirtBase,
 					pInfo.segInfo[0].ulTotalSegSize)) {
-				status = -EPERM;
+				status = DSP_EFAIL;
 			}
-
-			delete_mmapelement(pVirtBase, &mmaplist);
 		}
 	}
 loop_end:
@@ -630,7 +551,7 @@ loop_end:
 DBAPI DSPNode_FreeMsgBuf(DSP_HNODE hNode, IN BYTE *pBuffer,
 				IN OPTIONAL struct DSP_BUFFERATTR *pAttr)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPNode_FreeMsgBuf:\r\n")));
@@ -651,14 +572,14 @@ DBAPI DSPNode_FreeMsgBuf(DSP_HNODE hNode, IN BYTE *pBuffer,
 			}
 		} else {
 			/* Invalid parameter */
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPNode_FreeMsgBuf: "
 				"Invalid pointer in the Input\r\n")));
 		}
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPNode_FreeMsgBuf: "
 				"hNode is Invalid \r\n")));
@@ -675,7 +596,7 @@ DBAPI DSPNode_FreeMsgBuf(DSP_HNODE hNode, IN BYTE *pBuffer,
 DBAPI DSPNode_GetAttr(DSP_HNODE hNode, OUT struct DSP_NODEATTR *pAttr,
 		UINT uAttrSize)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPNode_GetAttr:\r\n")));
@@ -692,21 +613,21 @@ DBAPI DSPNode_GetAttr(DSP_HNODE hNode, OUT struct DSP_NODEATTR *pAttr,
 				status = DSPTRAP_Trap(&tempStruct,
 					CMD_NODE_GETATTR_OFFSET);
 			} else {
-				status = -EINVAL;
+				status = DSP_ESIZE;
 				DEBUGMSG(DSPAPI_ZONE_ERROR,
 					(TEXT("NODE: DSPNode_GetAttr: "
 					"Size is too small \r\n")));
 			}
 		} else {
 			/* Invalid parameter */
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPNode_GetAttr: "
 				"Invalid pointer in the Input\r\n")));
 		}
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPNode_GetAttr: "
 			"hNode is Invalid \r\n")));
@@ -723,7 +644,7 @@ DBAPI DSPNode_GetAttr(DSP_HNODE hNode, OUT struct DSP_NODEATTR *pAttr,
 DBAPI DSPNode_GetMessage(DSP_HNODE hNode, OUT struct DSP_MSG *pMessage,
 				UINT uTimeout)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 #ifdef DEBUG_BRIDGE_PERF
 	struct timeval tv_beg;
@@ -747,13 +668,13 @@ DBAPI DSPNode_GetMessage(DSP_HNODE hNode, OUT struct DSP_MSG *pMessage,
 			status = DSPTRAP_Trap(&tempStruct,
 				CMD_NODE_GETMESSAGE_OFFSET);
 		} else {
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPNode_GetMessage:"
 				"pMessage is Invalid \r\n")));
 		}
 	} else {
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPNode_GetMessage: "
 			"hNode is Invalid \r\n")));
@@ -772,10 +693,10 @@ DBAPI DSPNode_GetMessage(DSP_HNODE hNode, OUT struct DSP_MSG *pMessage,
  *  Purpose:
  *      Return the node type
  */
-int GetNodeType(DSP_HNODE hNode, DSP_NODETYPE *pNodeType)
+DSP_STATUS GetNodeType(DSP_HNODE hNode, DSP_NODETYPE *pNodeType)
 {
-	/*int status;*/
-	int status = 0;
+	/*DSP_STATUS status;*/
+	DSP_STATUS status = DSP_SOK;
 	struct DSP_NODEATTR nodeAttr;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("GetNodeType:\r\n")));
@@ -787,7 +708,7 @@ int GetNodeType(DSP_HNODE hNode, DSP_NODETYPE *pNodeType)
 			nodeAttr.iNodeInfo.nbNodeDatabaseProps.uNodeType;
 		}
 	} else {
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("GetNodeType: "
 					"hNode is Invalid \r\n")));
 	}
@@ -803,7 +724,7 @@ int GetNodeType(DSP_HNODE hNode, DSP_NODETYPE *pNodeType)
  */
 DBAPI DSPNode_Pause(DSP_HNODE hNode)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPNode_Pause:\r\n")));
@@ -815,7 +736,7 @@ DBAPI DSPNode_Pause(DSP_HNODE hNode)
 		status = DSPTRAP_Trap(&tempStruct, CMD_NODE_PAUSE_OFFSET);
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPNode_Pause: "
 				"hNode is Invalid Handle\r\n")));
 	}
@@ -831,7 +752,7 @@ DBAPI DSPNode_Pause(DSP_HNODE hNode)
 DBAPI DSPNode_PutMessage(DSP_HNODE hNode, IN CONST struct DSP_MSG *pMessage,
 						UINT uTimeout)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 #ifdef DEBUG_BRIDGE_PERF
 	struct timeval tv_beg;
@@ -855,14 +776,14 @@ DBAPI DSPNode_PutMessage(DSP_HNODE hNode, IN CONST struct DSP_MSG *pMessage,
 			status = DSPTRAP_Trap(&tempStruct,
 				CMD_NODE_PUTMESSAGE_OFFSET);
 		} else {
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPNode_PutMessage: "
 						"pMessage is Invalid \r\n")));
 		}
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPNode_PutMessage: "
 					"hNode is Invalid \r\n")));
@@ -885,7 +806,7 @@ DBAPI
 DSPNode_RegisterNotify(DSP_HNODE hNode, UINT uEventMask,
 		       UINT uNotifyType, struct DSP_NOTIFICATION *hNotification)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION,
@@ -908,20 +829,20 @@ DSPNode_RegisterNotify(DSP_HNODE hNode, UINT uEventMask,
 				status = DSPTRAP_Trap(&tempStruct,
 						CMD_NODE_REGISTERNOTIFY_OFFSET);
 			} else {
-				status = -ENOSYS;
+				status = DSP_ENOTIMPL;
 				DEBUGMSG(DSPAPI_ZONE_ERROR,
 					(TEXT("NODE: DSPNode_RegisterNotify: "
 					"Invalid Notification Mask \r\n")));
 			}
 		} else {
-			status = -EINVAL;
+			status = DSP_EVALUE;
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPNode_RegisterNotify:"
 						"Invalid Event type\r\n")));
 		}
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPNode_RegisterNotify: "
 				"hNode is Invalid \r\n")));
@@ -937,7 +858,7 @@ DSPNode_RegisterNotify(DSP_HNODE hNode, UINT uEventMask,
  */
 DBAPI DSPNode_Run(DSP_HNODE hNode)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPNode_Run:\r\n")));
@@ -949,7 +870,7 @@ DBAPI DSPNode_Run(DSP_HNODE hNode)
 		status = DSPTRAP_Trap(&tempStruct, CMD_NODE_RUN_OFFSET);
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPNode_Run: "
 					"hNode is Invalid Handle\r\n")));
 	}
@@ -963,16 +884,16 @@ DBAPI DSPNode_Run(DSP_HNODE hNode)
  *      Signal a task node running on a  DSP processor that it should
  *      exit its execute-phase function.
  */
-DBAPI DSPNode_Terminate(DSP_HNODE hNode, int *pStatus)
+DBAPI DSPNode_Terminate(DSP_HNODE hNode, DSP_STATUS *pStatus)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPNode_Terminate:\r\n")));
 
 	if (hNode) {
 		/* !DSP_ValidWritePtr means it is a valid write ptr */
-		if (!DSP_ValidWritePtr(pStatus, sizeof(int))) {
+		if (!DSP_ValidWritePtr(pStatus, sizeof(DSP_STATUS))) {
 			/* Set up the structure */
 			/* Call DSP Trap */
 			tempStruct.ARGS_NODE_TERMINATE.hNode = hNode;
@@ -980,11 +901,11 @@ DBAPI DSPNode_Terminate(DSP_HNODE hNode, int *pStatus)
 			status = DSPTRAP_Trap(&tempStruct,
 				CMD_NODE_TERMINATE_OFFSET);
 		} else
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPNode_Terminate: "
 					"hNode is Invalid Handle\r\n")));
@@ -1003,7 +924,7 @@ DBAPI DSPNode_GetUUIDProps(DSP_HPROCESSOR hProcessor,
 		IN CONST struct DSP_UUID *pNodeID,
 		 OUT struct DSP_NDBPROPS *pNodeProps)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION,
@@ -1023,14 +944,14 @@ DBAPI DSPNode_GetUUIDProps(DSP_HPROCESSOR hProcessor,
 				CMD_NODE_GETUUIDPROPS_OFFSET);
 		} else {
 			/* Invalid parameter */
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPNode_GetUUIDProps: "
 				       "Invalid pointer in the Input\r\n")));
 		}
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPNode_GetUUIDProps: "
 					"hProcessor is Invalid \r\n")));

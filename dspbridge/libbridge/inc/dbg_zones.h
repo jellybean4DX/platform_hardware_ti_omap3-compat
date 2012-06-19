@@ -95,7 +95,7 @@
     },                                      \
     (initialZones)                          \
 };
-extern int DBG_SetGT_DBG();
+extern DSP_STATUS DBG_SetGT_DBG();
 extern DBGPARAM dpCurSettings;
 
 #define DBG_SetGT() DBG_SetGT_DBG()
