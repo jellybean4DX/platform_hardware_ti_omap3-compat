@@ -14,32 +14,29 @@
  *  limitations under the License.
  */
 
- 
 /*
- *  ======== devdefs.h ========
+ *  ======== drvdefs.h ========
  *  DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *  Purpose:
- *      Definition of common include typedef between wmd.h and dev.h. Required
- *      to break circular dependency between WMD and DEV include files.
- * 
+ *      Definition of common include typedef between wmd.h and drv.h.
+ *
  *! Revision History:
  *! ================
- *! 12-Nov-1996 gp: Renamed from dev1.h.
- *! 30-May-1996 gp: Broke out from dev.h
+ *! 17-Jul-2000 rr: Created
  */
 
-#ifndef DEVDEFS_
-#define DEVDEFS_
+#ifndef DRVDEFS_
+#define DRVDEFS_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* WCD Device Object */
-	struct DEV_OBJECT;
-	/*typedef struct DEV_OBJECT *DEV_HOBJECT;*/
+/* WCD Driver Object */
+	struct DRV_OBJECT;
+	/*typedef struct DRV_OBJECT *DRV_HOBJECT;*/
 
 #ifdef __cplusplus
 }
 #endif
-#endif				/* DEVDEFS_ */
+#endif				/* DRVDEFS_ */

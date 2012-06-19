@@ -1,23 +1,23 @@
 /*
- * dspbridge/mpu_api/inc/DSPStream.h
- *
- * DSP-BIOS Bridge driver support functions for TI OMAP processors.
- *
- * Copyright (C) 2007 Texas Instruments, Inc.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU Lesser General Public License as published 
- * by the Free Software Foundation version 2.1 of the License.
- *
- * This program is distributed .as is. WITHOUT ANY WARRANTY of any kind,
- * whether express or implied; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ *  Copyright 2001-2008 Texas Instruments - http://www.ti.com/
+ * 
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 
 
 /*
  *  ======== DSPStream.h ========
+ *  DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *  Description: 
  *      This is the header for the DSP/BIOS Bridge stream module.
  *
@@ -52,9 +52,7 @@
  *! 20-Jul-2000 rr: Updated to version 0.8
  *! 27-Jun-2000 rr: Created from DBAPI.h
  */
-
 #include <host_os.h>
-
 #ifndef DSPStream_
 #define DSPStream_
 
@@ -72,13 +70,13 @@ extern "C" {
  *      apBuffer:           Ptr to location to hold array of buffers.
  *      uNumBufs:           The number of buffers to allocate of size uSize.
  *  Returns:
- *      0:                  Success.
- *      -EFAULT:            Invalid Stream handle.
- *      -ENOMEM:            Insufficient memory
- *      -EFAULT:            Parameter apBuffer is not valid.
- *      -EPERM:             Stream's alignment value not supported.
- *      -EINVAL:            Illegal size.
- *      -EPERM:             General failure to allocate buffer.
+ *      DSP_SOK:            Success.
+ *      DSP_EHANDLE:        Invalid Stream handle.
+ *      DSP_EMEMORY:        Insufficient memory
+ *      DSP_EPOINTER:       Parameter apBuffer is not valid.
+ *      DSP_EALIGNMENT:     Stream's alignment value not supported.
+ *      DSP_ESIZE:          Illegal size.
+ *      DSP_EFAIL:          General failure to allocate buffer.
  *  Details:
  */
 	extern DBAPI DSPStream_AllocateBuffers(DSP_HSTREAM hStream,
@@ -92,10 +90,10 @@ extern "C" {
  *  Parameters:
  *      hStream:            The stream handle.
  *  Returns:
- *      0:                  Success.
- *      -EFAULT:            Invalid Stream handle.
- *      -EPIPE:             Not all stream buffers have been reclaimed
- *      -EPERM:             Failure to Close the Stream
+ *      DSP_SOK:            Success.
+ *      DSP_EHANDLE:        Invalid Stream handle.
+ *      DSP_EPENDING:       Not all stream buffers have been reclaimed
+ *      DSP_EFAIL:          Failure to Close the Stream
  *  Details:
  */
 	extern DBAPI DSPStream_Close(DSP_HSTREAM hStream);
@@ -109,10 +107,10 @@ extern "C" {
  *      apBuffer:           The array of buffers to free.
  *      uNumBufs:           The number of buffers.
  *  Returns:
- *      0:                  Success.
- *      -EFAULT:            Invalid Stream handle.
- *      -EFAULT:            Parameter apBuffer is not valid.
- *      -EPERM:             Failure to free the data buffers
+ *      DSP_SOK:            Success.
+ *      DSP_EHANDLE:        Invalid Stream handle.
+ *      DSP_EPOINTER:       Parameter apBuffer is not valid.
+ *      DSP_EFAIL:          Failure to free the data buffers
  *  Details:
  */
 	extern DBAPI DSPStream_FreeBuffers(DSP_HSTREAM hStream,
@@ -127,12 +125,12 @@ extern "C" {
  *      pStreamInfo:        Ptr to the DSP_STREAMINFO structure.
  *      uStreamInfoSize:    The size of structure.
  *  Returns:
- *      0:                  Success.
- *      -EFAULT:            Invalid Stream handle.
- *      -EFAULT:            Parameter pStreamInfo is invalid.
- *      -EINVAL:            uStreamInfoSize is too small to hold all stream
+ *      DSP_SOK:            Success.
+ *      DSP_EHANDLE:        Invalid Stream handle.
+ *      DSP_EPOINTER:       Parameter pStreamInfo is invalid.
+ *      DSP_ESIZE:          uStreamInfoSize is too small to hold all stream
  *                          information.
- *      -EPERM:             Unable to retrieve Stream info
+ *      DSP_EFAIL:          Unable to retrieve Stream info
  *  Details:
  */
 	extern DBAPI DSPStream_GetInfo(DSP_HSTREAM hStream,
@@ -148,12 +146,12 @@ extern "C" {
  *      hStream:            The stream handle.
  *      bFlush:             Boolean flag
  *  Returns:
- *      0:                  Success.
- *      -EFAULT:            Invalid Stream handle.
- *      -ETIME:             Time out occurred.
+ *      DSP_SOK:            Success.
+ *      DSP_EHANDLE:        Invalid Stream handle.
+ *      DSP_ETIMEOUT:       Time out occurred.
  *      DSP_ERESTART:       A critical error has
  *                          occurred and the DSP is being restarted.
- *      -EPERM:             Unable to Idle the stream
+ *      DSP_EFAIL:          Unable to Idle the stream
  *  Details:
  */
 	extern DBAPI DSPStream_Idle(DSP_HSTREAM hStream, bool bFlush);
@@ -169,15 +167,15 @@ extern "C" {
  *      dwBufSize:          Size of actual buffer in bytes.
  *      dwArg:              User defined buffer context.
  *  Returns:
- *      0:                  Success.
- *      -EFAULT:            Invalid Stream handle.
- *      -EFAULT:            Invalid pBuffer pointer
- *      -ENOSR:             The stream has been issued the maximum number
+ *      DSP_SOK:            Success.
+ *      DSP_EHANDLE:        Invalid Stream handle.
+ *      DSP_EPOINTER:       Invalid pBuffer pointer
+ *      DSP_ESTREAMFULL:    The stream has been issued the maximum number
  *                          of buffers allowed in the stream at once;
  *                          buffers must be reclaimed from the stream
  *                          before any more can be issued.
- *      -EPERM:             Unable to issue the buffer.
- *      -ESRCH:             Unable to map shared buffer to client process.
+ *      DSP_EFAIL:          Unable to issue the buffer.
+ *      DSP_ETRANSLATE:     Unable to map shared buffer to client process.
  *  Details:
  */
 	extern DBAPI DSPStream_Issue(DSP_HSTREAM hStream, IN BYTE * pBuffer,
@@ -196,17 +194,17 @@ extern "C" {
  *      pAttrIn:            Ptr to the stream attributes (optional)
  *      phStream:           Ptr to location to store the stream handle.
  *  Returns:
- *      0:                  Success.
- *      -EFAULT:            Invalid phStream pointer.
- *      -EPERM:             Stream can not be opened for this node type/
- *      -EPERM:             uDirection is invalid
- *      -EINVAL:            uIndex is invalid, or, if pAttrIn != NULL,
+ *      DSP_SOK:            Success.
+ *      DSP_EPOINTER:       Invalid phStream pointer.
+ *      DSP_ENODETYPE:      Stream can not be opened for this node type/
+ *      DSP_EDIRECTION:     uDirection is invalid
+ *      DSP_EVALUE:         uIndex is invalid, or, if pAttrIn != NULL,
  *                          pAttrIn->uSegment is invalid.
- *      -EPERM:             General failure.
- *      -EPERM:             Stream mode is invalid.
+ *      DSP_EFAIL:          General failure.
+ *      DSP_ESTRMMODE:      Stream mode is invalid.
  *      DSP_EDMACHNL:       DMAChnlId is invalid, if STRMMODE is LDMA or RDMA.
- *      -EFAULT:            Invalid Stream handle.
- *      -ENOSYS:            Stream mode is not supported.
+ *      DSP_EHANDLE:        Invalid Stream handle.
+ *      DSP_ENOTIMPL:       Stream mode is not supported.
  *
  *  Details:
  */
@@ -225,10 +223,10 @@ extern "C" {
  *      uSize:              Size of the allocated buffer(GPP bytes)
  *      pBffer:             Address of the Allocated buffer
  *  Returns:
- *      0:                  Success
- *      -EFAULT:            Invalid Stream handle
- *      -EFAULT:            Invalid pBuffer
- *      -EPERM:             Failure to Prepare a buffer
+ *      DSP_SOK:            Success
+ *      DSP_EHANDLE:        Invalid Stream handle
+ *      DSP_EPOINTER:       Invalid pBuffer
+ *      DSP_EFAIL:          Failure to Prepare a buffer
  */
 	extern DBAPI DSPStream_PrepareBuffer(DSP_HSTREAM hStream, UINT uSize,
 					     BYTE * pBuffer);
@@ -244,14 +242,14 @@ extern "C" {
  *      pBufSize:           Ptr to location to store actual size of the buffer.
  *      pdwArg:             Ptr to location to store user defined context.
  *  Returns:
- *      0:                  Success.
- *      -EFAULT:            Invalid Stream handle.
- *      -EFAULT:            One of pBufPtr or pBytes is invalid.
- *      -ETIME:             Timeout waiting from I/O completion.
+ *      DSP_SOK:            Success.
+ *      DSP_EHANDLE:        Invalid Stream handle.
+ *      DSP_EPOINTER:       One of pBufPtr or pBytes is invalid.
+ *      DSP_ETIMEOUT:       Timeout waiting from I/O completion.
  *      DSP_ERESTART:       A critical error has occurred and
  *                          the DSP is being restarted.
- *      -EPERM:             Unable to Reclaim buffer.
- *      -ESRCH:             Unable to map shared buffer to client process.
+ *      DSP_EFAIL:          Unable to Reclaim buffer.
+ *      DSP_ETRANSLATE:     Unable to map shared buffer to client process.
  *  Details:
  */
 	extern DBAPI DSPStream_Reclaim(DSP_HSTREAM hStream,
@@ -270,11 +268,11 @@ extern "C" {
  *      uNotifyType:        Type of notification to be sent.
  *      hNotification:      Handle to be used for notification.
  *  Returns:
- *      0:                  Success.
- *      -EFAULT:            Invalid stream handle or invalid hNotification
- *      -EINVAL:            uEventMask is invalid
+ *      DSP_SOK:            Success.
+ *      DSP_EHANDLE:        Invalid stream handle or invalid hNotification
+ *      DSP_EVALUE:         uEventMask is invalid
  *      DSP_ENOTIMP:        Not supported as specified in uNotifyType
- *      -EPERM:             Unable to Register for notification
+ *      DSP_EFAIL:          Unable to Register for notification
  *  Details:
  */
 	extern DBAPI DSPStream_RegisterNotify(DSP_HSTREAM hStream,
@@ -291,11 +289,11 @@ extern "C" {
  *      pMask:              Pointer to the mask of ready streams.
  *      uTimeout:           Timeout value in milliseconds.
  *  Returns:
- *      0:                  Success.
- *      -EDOM:              nStreams is out of range
- *      -EFAULT:            Invalid aStreamTab or pMask pointer.
- *      -ETIME              Timeout occured.
- *      -EPERM:             Failure to select a stream.
+ *      DSP_SOK:            Success.
+ *      DSP_ERANGE:         nStreams is out of range
+ *      DSP_EPOINTER:       Invalid aStreamTab or pMask pointer.
+ *      DSP_ETIMEOUT        Timeout occured.
+ *      DSP_EFAIL:          Failure to select a stream.
  *      DSP_ERESTART:       A critical error has occurred and
  *                          the DSP is being restarted.
  *  Details:
@@ -314,10 +312,10 @@ extern "C" {
  *      uSize:              Size of the allocated buffer(GPP bytes)
  *      pBffer:             Address of the Allocated buffer
  *  Returns:
- *      0:                  Success
- *      -EFAULT:            Invalid Stream handle
- *      -EFAULT:            Invalid pBuffer
- *      -EPERM:             Failure to UnPrepare a buffer
+ *      DSP_SOK:            Success
+ *      DSP_EHANDLE:        Invalid Stream handle
+ *      DSP_EPOINTER:       Invalid pBuffer
+ *      DSP_EFAIL:          Failure to UnPrepare a buffer
  */
 	extern DBAPI DSPStream_UnprepareBuffer(DSP_HSTREAM hStream, UINT uSize,
 					       BYTE * pBuffer);

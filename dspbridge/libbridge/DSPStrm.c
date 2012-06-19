@@ -54,7 +54,7 @@
  *!					DSPStream_Select() for NULL pointers.
  *!					Also set *pMask to 0 if nStreams is 0.
  *! 05-Dec-2000 jeh Return DSP_ESIZE, not DSP_EVALUE in DSPStream_GetInfo,
- *!                 set status to 0 in DSPStream_UnprepareBuffer().
+ *!                 set status to DSP_SOK in DSPStream_UnprepareBuffer().
  *! 10-Nov-2000 rr: DSP_PBUFFER modified to BYTE *. RegisterNotify
  *!                 catches Invalid Events and Masks.
  *! 23-Oct-2000 jeh Free buffers in DSPStream_FreeBuffer().
@@ -77,7 +77,7 @@
 /*  ----------------------------------- DSP/BIOS Bridge */
 #include <std.h>
 #include <dbdefs.h>
-#include <errno.h>
+#include <errbase.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
 #include <csl.h>
@@ -98,7 +98,7 @@
 extern int hMediaFile;		/* class driver handle */
 
 /*  ----------------------------------- Function Prototypes */
-static int GetStrmInfo(DSP_HSTREAM hStream, struct STRM_INFO *pStrmInfo,
+static DSP_STATUS GetStrmInfo(DSP_HSTREAM hStream, struct STRM_INFO *pStrmInfo,
 			      UINT uStreamInfoSize);
 
 /*
@@ -111,7 +111,7 @@ DBAPI DSPStream_AllocateBuffers(DSP_HSTREAM hStream, UINT uSize,
 {
 	UINT i;
 	UINT uAllocated = 0;
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 	PVOID pBuf = NULL;
 	struct STRM_INFO strmInfo;
@@ -121,7 +121,7 @@ DBAPI DSPStream_AllocateBuffers(DSP_HSTREAM hStream, UINT uSize,
 			(TEXT("NODE: DSPStream_AllocateBuffers:\r\n")));
 	if (!hStream) {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPStream_AllocateBuffers: "
 						"hStrm is Invalid \r\n")));
@@ -129,7 +129,7 @@ DBAPI DSPStream_AllocateBuffers(DSP_HSTREAM hStream, UINT uSize,
 	}
 	if (!apBuffer) {
 		/* Invalid parameter */
-		status = -EFAULT;
+		status = DSP_EPOINTER;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPStream_AllocateBuffers: "
 				"Invalid pointer in the Input\r\n")));
@@ -141,7 +141,7 @@ DBAPI DSPStream_AllocateBuffers(DSP_HSTREAM hStream, UINT uSize,
 	strmInfo.pUser = &userInfo;
 	status = GetStrmInfo(hStream, &strmInfo, sizeof(struct DSP_STREAMINFO));
 	if (!DSP_SUCCEEDED(status)) {
-		status = -EPERM;
+		status = DSP_EFAIL;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("DSPStream_AllocateBuffers: "
 				"DSP_FAILED to get strm info\r\n")));
@@ -161,7 +161,7 @@ DBAPI DSPStream_AllocateBuffers(DSP_HSTREAM hStream, UINT uSize,
 		for (i = 0; i < uNumBufs; i++) {
 			pBuf = MEM_Alloc(uSize, MEM_NONPAGED);
 			if (!pBuf) {
-				status = -ENOMEM;
+				status = DSP_EMEMORY;
 				uAllocated = i;
 				break;
 			} else
@@ -189,7 +189,7 @@ DBAPI DSPStream_Close(DSP_HSTREAM hStream)
 #ifndef LINUX
 	HANDLE hEvent;
 #endif
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 	struct STRM_INFO strmInfo;
 	struct DSP_STREAMINFO userInfo;
@@ -200,7 +200,7 @@ DBAPI DSPStream_Close(DSP_HSTREAM hStream)
 
 	if (!hStream) {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPStream_Close: hStrm is Invalid \r\n")));
 		return status;
@@ -209,7 +209,7 @@ DBAPI DSPStream_Close(DSP_HSTREAM hStream)
 	strmInfo.pUser = &userInfo;
 	status = GetStrmInfo(hStream, &strmInfo, sizeof(struct DSP_STREAMINFO));
 	if (!DSP_SUCCEEDED(status)) {
-		status = -EPERM;
+		status = DSP_EFAIL;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPStream_Close: "
 					"ERROR in Getting Strm Info \r\n")));
 		return status;
@@ -238,11 +238,11 @@ DBAPI DSPStream_Close(DSP_HSTREAM hStream)
 				if (munmap(strmInfo.pVirtBase,
 					pInfo.segInfo[strmInfo.uSegment-1]\
 						.ulTotalSegSize)) {
-					status = -EPERM;
+					status = DSP_EFAIL;
 				}
 			}
 		} else
-			status = -EBADR;	/*no SM segments */
+			status = DSP_EBADSEGID;	/*no SM segments */
 
 	}
 #ifndef LINUX			/* Events are handled in kernel */
@@ -277,7 +277,7 @@ DBAPI DSPStream_FreeBuffers(DSP_HSTREAM hStream, IN BYTE **apBuffer,
 		UINT uNumBufs)
 {
 	UINT i;
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 	struct STRM_INFO strmInfo;
 	struct DSP_STREAMINFO userInfo;
@@ -287,7 +287,7 @@ DBAPI DSPStream_FreeBuffers(DSP_HSTREAM hStream, IN BYTE **apBuffer,
 
 	if (!hStream) {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPStream_FreeBuffers: "
 						"hStrm is Invalid \r\n")));
@@ -295,7 +295,7 @@ DBAPI DSPStream_FreeBuffers(DSP_HSTREAM hStream, IN BYTE **apBuffer,
 	}
 	if (!apBuffer) {
 		/* Invalid parameter */
-		status = -EFAULT;
+		status = DSP_EPOINTER;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPStream_FreeBuffers: "
 					"Invalid pointer in the Input\r\n")));
@@ -307,7 +307,7 @@ DBAPI DSPStream_FreeBuffers(DSP_HSTREAM hStream, IN BYTE **apBuffer,
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("DSPStream_FreeBuffers. "
 						"Free Failed. Bad mode.")));
-		status = -EPERM;
+		status = DSP_EFAIL;
 		goto func_end;
 	}
 	if (strmInfo.uSegment > 0) {
@@ -321,7 +321,7 @@ DBAPI DSPStream_FreeBuffers(DSP_HSTREAM hStream, IN BYTE **apBuffer,
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("DSPStream_FreeBuffers: "
 						 "Failed to Free Buf")));
-			status = -EPERM;
+			status = DSP_EFAIL;
 		}
 	} else {
 		for (i = 0; i < uNumBufs; i++) {
@@ -333,6 +333,9 @@ DBAPI DSPStream_FreeBuffers(DSP_HSTREAM hStream, IN BYTE **apBuffer,
 		}	/* end for */
 	}
 func_end:
+	/* Return DSP_SOK if OS calls returned 0 */
+	if (status == 0)
+		status = DSP_SOK;
 
 	return status;
 }
@@ -345,13 +348,16 @@ func_end:
 DBAPI DSPStream_GetInfo(DSP_HSTREAM hStream,
 		  OUT struct DSP_STREAMINFO *pStreamInfo, UINT uStreamInfoSize)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	struct STRM_INFO strmInfo;/* include stream's private virt addr info */
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPStream_GetInfo:\r\n")));
 
 	strmInfo.pUser = pStreamInfo;
 	status = GetStrmInfo(hStream, &strmInfo, uStreamInfoSize);
+	/* Return DSP_SOK if OS calls returned 0 */
+	if (status == 0)
+		status = DSP_SOK;
 
 	return status;
 }
@@ -364,7 +370,7 @@ DBAPI DSPStream_GetInfo(DSP_HSTREAM hStream,
  */
 DBAPI DSPStream_Idle(DSP_HSTREAM hStream, bool bFlush)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPStream_Idle:\r\n")));
@@ -377,7 +383,7 @@ DBAPI DSPStream_Idle(DSP_HSTREAM hStream, bool bFlush)
 		status = DSPTRAP_Trap(&tempStruct, CMD_STRM_IDLE_OFFSET);
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPStream_Idle: "
 						"hStrm is Invalid \r\n")));
 	}
@@ -392,7 +398,7 @@ DBAPI DSPStream_Idle(DSP_HSTREAM hStream, bool bFlush)
 DBAPI DSPStream_Issue(DSP_HSTREAM hStream, IN BYTE *pBuffer,
 		ULONG dwDataSize, ULONG dwBufSize, IN DWORD dwArg)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPStream_Issue:\r\n")));
@@ -402,7 +408,7 @@ DBAPI DSPStream_Issue(DSP_HSTREAM hStream, IN BYTE *pBuffer,
 		if (pBuffer) {
 			/* Check that the size isn't too small */
 			if (dwDataSize > dwBufSize) {
-				status = -EINVAL;
+				status = DSP_EINVALIDARG;
 				DEBUGMSG(DSPAPI_ZONE_ERROR,
 					(TEXT("NODE: DSPStream_Issue: "
 					"Invalid argument in the Input\r\n")));
@@ -417,17 +423,21 @@ DBAPI DSPStream_Issue(DSP_HSTREAM hStream, IN BYTE *pBuffer,
 				/* Call DSP Trap */
 				status = DSPTRAP_Trap(&tempStruct,
 					CMD_STRM_ISSUE_OFFSET);
+				/* Return DSP_SOK if OS calls returned 0 */
+				if (status == 0)
+					status = DSP_SOK;
+
 			}
 		} else {
 			/* Invalid parameter */
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPStream_Issue: "
 					"Invalid pointer in the Input\r\n")));
 		}
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPStream_Issue: "
 						"hStrm is Invalid \r\n")));
 	}
@@ -445,7 +455,7 @@ DBAPI DSPStream_Open(DSP_HNODE hNode, UINT uDirection, UINT uIndex,
 	       IN OPTIONAL struct DSP_STREAMATTRIN *pAttrIn,
 	       OUT DSP_HSTREAM *phStream)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 	struct STRM_ATTR strmAttrs;
 #ifndef LINUX			/* Events are handled in kernel */
@@ -459,19 +469,19 @@ DBAPI DSPStream_Open(DSP_HNODE hNode, UINT uDirection, UINT uIndex,
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPStream_Open:\r\n")));
 
 	if (!hNode) {
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPStream_Open: "
 					"Invalid handle in the Input\r\n")));
 		return status;
 	}
 	if (uDirection != DSP_TONODE && uDirection != DSP_FROMNODE) {
-		status = -EPERM;
+		status = DSP_EDIRECTION;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPStream_Open: "
 					"Invalid direction in the Input\r\n")));
 		return status;
 	}
 	if (!phStream) {
-		status = -EFAULT;
+		status = DSP_EPOINTER;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPStream_Open: "
 				"Invalid pointer in the Input\r\n")));
@@ -495,7 +505,7 @@ DBAPI DSPStream_Open(DSP_HNODE hNode, UINT uDirection, UINT uIndex,
 	/* Create an auto reset event. */
 	strmAttrs.hUserEvent = CreateEvent(NULL,false,false,wszEventName);
 	if (!strmAttrs.hUserEvent) {
-		status = -EPERM;
+		status = DSP_EFAIL;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPStream_Open: "
 					"Failed to Create the Event \r\n")));
 	}
@@ -505,12 +515,12 @@ DBAPI DSPStream_Open(DSP_HNODE hNode, UINT uDirection, UINT uIndex,
 	if (pAttrIn) {
 		if (pAttrIn->lMode == STRMMODE_LDMA) {
 			/* No System-DMA support */
-			status = -ENOSYS;
+			status = DSP_ENOTIMPL;
 		} else
 		    if ((pAttrIn->lMode != STRMMODE_PROCCOPY)
 				&& (pAttrIn->lMode != STRMMODE_ZEROCOPY)
 				&& (pAttrIn->lMode != STRMMODE_RDMA)) {
-			status = -EPERM;	/* illegal stream mode */
+			status = DSP_ESTRMMODE;	/* illegal stream mode */
 		}
 		pAttrIn->uSegment = abs(pAttrIn->uSegment);
 		/* make non-neg */
@@ -524,7 +534,8 @@ DBAPI DSPStream_Open(DSP_HNODE hNode, UINT uDirection, UINT uIndex,
 		if ((pAttrIn->lMode == STRMMODE_ZEROCOPY) ||
 				(pAttrIn->lMode == STRMMODE_RDMA)) {
 			if (pAttrIn->uSegment == 0) {
-				status = -EINVAL;	/* must be SM segment */
+				status = DSP_ENOTSHAREDMEM;	/* must be
+								SM segment */
 				goto loop_end;
 			}
 			/* >0 is SM segment. Get default SM Mgr */
@@ -532,27 +543,27 @@ DBAPI DSPStream_Open(DSP_HNODE hNode, UINT uDirection, UINT uIndex,
 			tempStruct.ARGS_CMM_GETHANDLE.phCmmMgr = &hCmm;
 			status = DSPTRAP_Trap(&tempStruct,
 					CMD_CMM_GETHANDLE_OFFSET);
-			if (status == 0) {
+			if (status == DSP_SOK) {
 				/* Get SM segment info from CMM */
 				tempStruct.ARGS_CMM_GETINFO.hCmmMgr = hCmm;
 				tempStruct.ARGS_CMM_GETINFO.pCmmInfo = &pInfo;
 				status = DSPTRAP_Trap(&tempStruct,
 						CMD_CMM_GETINFO_OFFSET);
-				if (status != 0)
-					status = -EPERM;
+				if (status != DSP_SOK)
+					status = DSP_EFAIL;
 			} else
-				status = -EPERM;
+				status = DSP_EFAIL;
 
 			if (!DSP_SUCCEEDED(status ||
 				!(pInfo.ulNumGPPSMSegs >= pAttrIn->uSegment))) {
-				status = -EBADR; /* no SM segments */
+				status = DSP_EBADSEGID; /* no SM segments */
 				goto loop_end;
 			}
 			/* segInfo index starts at 0 */
 			if ((pInfo.segInfo[pAttrIn->uSegment-1].dwSegBasePa
 				== 0) || (pInfo.segInfo[pAttrIn->uSegment-1]\
 					.ulTotalSegSize) < 0) {
-				status = -EPERM;
+				status = DSP_EFAIL;
 				DEBUGMSG(DSPAPI_ZONE_ERROR,
 						(TEXT("STRM:DSPStream_Open: "
 						"Bad SM info...why?\r\n")));
@@ -564,7 +575,7 @@ DBAPI DSPStream_Open(DSP_HNODE hNode, UINT uDirection, UINT uIndex,
 				MAP_SHARED | MAP_LOCKED, hMediaFile, pInfo\
 				.segInfo[pAttrIn->uSegment-1].dwSegBasePa);
 			if (strmAttrs.pVirtBase == NULL) {
-				status = -EPERM;
+				status = DSP_EFAIL;
 				DEBUGMSG(DSPAPI_ZONE_ERROR,
 					(TEXT("STRM: DSPStream_Open: "
 						"Virt alloc failed\r\n")));
@@ -601,7 +612,7 @@ loop_end:
  */
 DBAPI DSPStream_PrepareBuffer(DSP_HSTREAM hStream, UINT uSize, BYTE *pBuffer)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 #ifndef LINUX
 	/*  Pages are never swapped out (i.e. always locked in Linux) */
 	ULONG aPageTab[STRM_MAXLOCKPAGES];
@@ -611,26 +622,26 @@ DBAPI DSPStream_PrepareBuffer(DSP_HSTREAM hStream, UINT uSize, BYTE *pBuffer)
 #endif
 	/* Do error checking here to API spec. We don't call down to WCD */
 	if (!hStream)
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 
 	if (DSP_SUCCEEDED(status)) {
 		if (!pBuffer)
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 	}
 
 	if (DSP_SUCCEEDED(status)) {
 		if (uSize <= 0)
-			status = -EINVAL;
+			status = DSP_ESIZE;
 	}
 #ifndef LINUX
 	/*  Pages are never swapped out (i.e. always locked in Linux) */
 	if (DSP_SUCCEEDED(status)) {
 		if (cPages > STRM_MAXLOCKPAGES)
-			status = -EPERM;
+			status = DSP_EFAIL;
 		else {
 			if (!LockPages((LPVOID)pBuffer, uSize, aPageTab,
 					LOCKFLAG_WRITE))
-				status = -EPERM;
+				status = DSP_EFAIL;
 		}
 	}
 #endif
@@ -646,7 +657,7 @@ DBAPI DSPStream_PrepareBuffer(DSP_HSTREAM hStream, UINT uSize, BYTE *pBuffer)
 DBAPI DSPStream_Reclaim(DSP_HSTREAM hStream, OUT BYTE **pBufPtr,
 		OUT ULONG *pDataSize, OUT ULONG *pBufSize, OUT DWORD *pdwArg)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPStream_Reclaim:\r\n")));
@@ -665,14 +676,14 @@ DBAPI DSPStream_Reclaim(DSP_HSTREAM hStream, OUT BYTE **pBufPtr,
 					CMD_STRM_RECLAIM_OFFSET);
 		} else {
 			/* Invalid parameter */
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 				(TEXT("NODE: DSPStream_Reclaim: "
 					"Invalid pointer in the Input\r\n")));
 		}
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT("NODE: DSPStream_Reclaim: "
 						"hStrm is Invalid \r\n")));
 	}
@@ -689,7 +700,7 @@ DBAPI
 DSPStream_RegisterNotify(DSP_HSTREAM hStream, UINT uEventMask,
 		 UINT uNotifyType, struct DSP_NOTIFICATION *hNotification)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION,
@@ -711,20 +722,20 @@ DSPStream_RegisterNotify(DSP_HSTREAM hStream, UINT uEventMask,
 				status = DSPTRAP_Trap(&tempStruct,
 						CMD_STRM_REGISTERNOTIFY_OFFSET);
 			} else {
-				status = -ENOSYS;
+				status = DSP_ENOTIMPL;
 				DEBUGMSG(DSPAPI_ZONE_ERROR,
 					(TEXT("NODE: DSPStream_RegisterNotify: "
 						"Invalid Notify Mask \r\n")));
 			}
 		} else {
-			status = -EINVAL;
+			status = DSP_EVALUE;
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 					(TEXT("NODE: DSPStream_RegisterNotify: "
 						"Invalid Event Mask \r\n")));
 		}
 	} else {
 		/* Invalid handle */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 			(TEXT("NODE: DSPStream_RegisterNotify: "
 					"Invalid Handle \r\n")));
@@ -741,7 +752,7 @@ DSPStream_RegisterNotify(DSP_HSTREAM hStream, UINT uEventMask,
 DBAPI DSPStream_Select(IN DSP_HSTREAM *aStreamTab,
 		 UINT nStreams, OUT UINT *pMask, UINT uTimeout)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	DEBUGMSG(DSPAPI_ZONE_FUNCTION, (TEXT("NODE: DSPStream_Select:\r\n")));
@@ -761,7 +772,7 @@ DBAPI DSPStream_Select(IN DSP_HSTREAM *aStreamTab,
 			*pMask = 0;
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EPOINTER;
 		DEBUGMSG(DSPAPI_ZONE_ERROR,
 		 (TEXT("NODE: DSPStream_Select: hStrm is Invalid \r\n")));
 	}
@@ -777,27 +788,27 @@ DBAPI DSPStream_Select(IN DSP_HSTREAM *aStreamTab,
 DBAPI DSPStream_UnprepareBuffer(DSP_HSTREAM hStream, UINT uSize,
 				BYTE *pBuffer)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 
 	/* Do error checking here to API spec. We don't call down to WCD */
 	if (!hStream)
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 
 	if (DSP_SUCCEEDED(status)) {
 		if (!pBuffer)
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 	}
 
 	if (DSP_SUCCEEDED(status)) {
 		/*|| ((LPVOID)pBuffer == NULL) - already checked above */
 		if ((uSize <= 0))
-			status = -EPERM;
+			status = DSP_EFAIL;
 	}
 #ifndef LINUX			/*  Pages are never swapped out
 						(i.e. always locked in Linux) */
 	if (DSP_SUCCEEDED(status)) {
 		if (!UnlockPages((LPVOID) pBuffer, uSize))
-			status = -EPERM;
+			status = DSP_EFAIL;
 	}
 #endif
 
@@ -807,10 +818,10 @@ DBAPI DSPStream_UnprepareBuffer(DSP_HSTREAM hStream, UINT uSize,
 /*
  *  ======== GetStrmInfo ========
  */
-static int GetStrmInfo(DSP_HSTREAM hStream, struct STRM_INFO *pStrmInfo,
+static DSP_STATUS GetStrmInfo(DSP_HSTREAM hStream, struct STRM_INFO *pStrmInfo,
 							UINT uStreamInfoSize)
 {
-	int status = 0;
+	DSP_STATUS status = DSP_SOK;
 	Trapped_Args tempStruct;
 
 	if (hStream) {
@@ -830,7 +841,7 @@ static int GetStrmInfo(DSP_HSTREAM hStream, struct STRM_INFO *pStrmInfo,
 				status = DSPTRAP_Trap(&tempStruct,
 						CMD_STRM_GETINFO_OFFSET);
 			} else {
-				status = -EINVAL;
+				status = DSP_ESIZE;
 				DEBUGMSG(DSPAPI_ZONE_ERROR,
 					 (TEXT("NODE: DSPStream_GetInfo: "
 					 "uStreamInfo size is less than the "
@@ -838,14 +849,14 @@ static int GetStrmInfo(DSP_HSTREAM hStream, struct STRM_INFO *pStrmInfo,
 			}
 		} else {
 			/* Invalid parameter */
-			status = -EFAULT;
+			status = DSP_EPOINTER;
 			DEBUGMSG(DSPAPI_ZONE_ERROR,
 				 (TEXT("NODE: DSPStream_GetInfo: "
 					"Invalid pointer\r\n")));
 		}
 	} else {
 		/* Invalid pointer */
-		status = -EFAULT;
+		status = DSP_EHANDLE;
 		DEBUGMSG(DSPAPI_ZONE_ERROR, (TEXT(
 			"NODE: DSPStream_GetInfo: hStrm is Invalid \r\n")));
 	}
