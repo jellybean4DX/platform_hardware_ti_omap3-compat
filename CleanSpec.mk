@@ -45,6 +45,7 @@
 #$(call add-clean-step, rm -rf $(PRODUCT_OUT)/data/*)
 
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj/SHARED_LIBRARIES/overlay.omap3_intermediates)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj/SHARED_LIBRARIES/hwcomposer.omap3_intermediates)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj/SHARED_LIBRARIES/libbridge_intermediates)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj/SHARED_LIBRARIES/libskiahw_intermediates)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj/SHARED_LIBRARIES/libstagefrighthw_intermediates)
