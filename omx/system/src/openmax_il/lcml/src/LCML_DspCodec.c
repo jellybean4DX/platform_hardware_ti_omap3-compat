@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Texas Instruments - http://www.ti.com/
  *
@@ -58,7 +57,7 @@
 #include <string.h>
 #include "usn.h"
 #include <sys/time.h>
-#include <utils/Log.h>
+#include <cutils/Log.h>
 
 #define CEXEC_DONE 1
 /*DSP_HNODE hDasfNode;*/
