@@ -62,8 +62,8 @@
 #define CEXEC_DONE 1
 /*DSP_HNODE hDasfNode;*/
 #define ABS_DLL_NAME_LENGTH 128
-#undef LOG_TAG
-#define LOG_TAG "TI_LCML"
+#undef ALOG_TAG
+#define ALOG_TAG "TI_LCML"
 
 
 /* not all the allocations done at lcml level should be 128 byte aligned so
