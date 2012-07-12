@@ -19,7 +19,7 @@
 #include <dlfcn.h>
 
 #include <HardwareAPI.h>
-#include <MediaDebug,h>
+#include <MediaDebug.h>
 
 namespace android {
 
