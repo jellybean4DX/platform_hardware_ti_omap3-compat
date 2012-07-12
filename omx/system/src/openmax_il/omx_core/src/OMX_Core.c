@@ -11,7 +11,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <utils/Log.h>
+#include <cutils/Log.h>
 
 #undef LOG_TAG
 #define LOG_TAG "TIOMX_CORE"
