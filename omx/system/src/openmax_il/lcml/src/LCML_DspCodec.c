@@ -510,7 +510,7 @@ ERROR:
     LCML_FREE(argv);
 #endif
     OMX_PRINT1 (((LCML_CODEC_INTERFACE *)hInt)->dbg, "%d :: Exiting Init_DSPSubSystem\n error = %x\n", __LINE__, eError);
-    LOGV("%d :: Exiting Init_DSPSubSystem\n error = %x\n", __LINE__, eError);
+    ALOGV("%d :: Exiting Init_DSPSubSystem\n error = %x\n", __LINE__, eError);
     return eError;
 }
 
@@ -827,7 +827,7 @@ ERROR:
     LCML_FREE(argv);
 #endif
     OMX_PRINT1 (((LCML_CODEC_INTERFACE *)hInt)->dbg, "%d :: Exiting Init_DSPSubSystem\n", __LINE__);
-    LOGV("%d :: Exiting Init_DSPSubSystem %d\n", __LINE__, eError);
+    ALOGV("%d :: Exiting Init_DSPSubSystem %d\n", __LINE__, eError);
     return eError;
 }
 
