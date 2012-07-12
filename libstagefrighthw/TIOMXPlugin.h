@@ -18,7 +18,7 @@
 
 #define TI_OMX_PLUGIN_H_
 
-#include <media/hardware/OMXPluginBase.h>
+#include <OMXPluginBase.h>
 
 namespace android {
 
