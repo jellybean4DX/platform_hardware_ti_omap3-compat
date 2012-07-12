@@ -1911,7 +1911,7 @@ void* MessagingThread(void* arg)
                             }
                             /* USN updates*/
                             args[8] = (void *) tmpDspStructAddress->iBufSizeUsed ;
-                            /* managing buffers  and free buffer logic */
+                            /* managing buffers  and free buffer ALOGIc */
 
                             OMX_PRINT2 (((LCML_CODEC_INTERFACE *)((LCML_DSP_INTERFACE *)arg)->pCodecinterfacehandle)->dbg, 
                                     "GOT MESSAGE EMMCodecBufferProcessed  and now unmapping buffer type %p \n", args[2]);
