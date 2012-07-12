@@ -8,7 +8,8 @@ LOCAL_CFLAGS := $(PV_CFLAGS_MINUS_VISIBILITY)
 
 LOCAL_C_INCLUDES:= \
     $(ANDROID_BUILD_TOP)/frameworks/native/include/media/hardware \
-    $(ANDROID_BUILD_TOP)/frameworks/native/include/media/openmax
+    $(ANDROID_BUILD_TOP)/frameworks/native/include/media/openmax \
+    $(ANDROID_BUILD_TOP)/frameworks/av/include/media/stagefright
 
 LOCAL_SHARED_LIBRARIES := \
     libbinder \
