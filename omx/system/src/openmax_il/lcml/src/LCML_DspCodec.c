@@ -1601,9 +1601,8 @@ OMX_ERRORTYPE FreeResources (LCML_DSP_INTERFACE *hInterface)
 {
     OMX_ERRORTYPE eError = OMX_ErrorNone;
     struct LCML_DSP_INTERFACE *codec;
-    struct OMX_TI_Debug dbg = ((LCML_CODEC_INTERFACE*)hInterface->pCodecinterfacehandle)->dbg;
 
-    OMX_PRINT1(dbg, "%d :: LCML:: FreeResources\n",__LINE__);
+    OMX_PRINT1 ((struct OMX_TI_Debug)(((LCML_CODEC_INTERFACE *)hInterface->pCodecinterfacehandle)->dbg), "%d :: LCML:: FreeResources\n",__LINE__);
     if(hInterface->dspCodec != NULL)
     {
         LCML_FREE(hInterface->dspCodec);
@@ -1615,7 +1614,7 @@ OMX_ERRORTYPE FreeResources (LCML_DSP_INTERFACE *hInterface)
         pthread_mutex_destroy(&codec->m_isStopped_mutex);
         pthread_mutex_lock(&codec->mutex);
 
-        OMX_PRINT1(dbg, "%d :: LCML:: FreeResources\n",__LINE__);
+        OMX_PRINT1 ((struct OMX_TI_Debug)(((LCML_CODEC_INTERFACE *)hInterface->pCodecinterfacehandle)->dbg), "%d :: LCML:: FreeResources\n",__LINE__);
         if(codec->g_aNotificationObjects[0]!= NULL)
         {
             LCML_FREE(codec->g_aNotificationObjects[0]);
@@ -1632,7 +1631,8 @@ OMX_ERRORTYPE FreeResources (LCML_DSP_INTERFACE *hInterface)
                 codec->g_aNotificationObjects[2] = NULL;
             }
  #endif
-            OMX_DBG_CLOSE(dbg);
+            OMX_DBG_CLOSE((struct OMX_TI_Debug )(((LCML_CODEC_INTERFACE*)hInterface->pCodecinterfacehandle)->dbg)); 	
+            //LCML_FREE(((struct LCML_CODEC_INTERFACE*)hInterface->pCodecinterfacehandle));
 
             LCML_FREE(hInterface->pCodecinterfacehandle);
             hInterface->pCodecinterfacehandle = NULL;
